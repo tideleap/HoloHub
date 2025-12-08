@@ -1976,7 +1976,7 @@ function PlayPageClient() {
     // 检查是否有记忆
     const memory = loadDanmakuMemory(title);
     if (memory) {
-      console.log('[弹幕] 找到记忆 - 视频:', title, '→ 弹幕源:', memory.animeTitle);
+      console.log('[弹幕] 找到缓存 - 视频:', title, '→ 弹幕源:', memory.animeTitle);
 
       // 获取该动漫的所有剧集列表
       try {
@@ -2011,13 +2011,14 @@ function PlayPageClient() {
               memory.searchKeyword // 保留原有的搜索关键词
             );
 
+            console.log('[弹幕] 使用缓存成功，跳过搜索');
             await loadDanmaku(episode.episodeId);
-            return;
+            return; // 成功使用缓存，直接返回
           }
         }
 
-        // 如果使用记忆加载失败，清除该记忆并继续自动搜索
-        console.warn('[弹幕] 使用缓存加载失败，清除缓存并从头搜索');
+        // 如果使用记忆加载失败（没有找到对应的剧集），清除该记忆并继续自动搜索
+        console.warn('[弹幕] 缓存中没有找到对应剧集，清除缓存并重新搜索');
         if (artPlayerRef.current) {
           artPlayerRef.current.notice.show = '缓存的弹幕源失效，正在重新搜索...';
         }
@@ -2029,10 +2030,10 @@ function PlayPageClient() {
               const memories = JSON.parse(memoriesJson);
               delete memories[title];
               localStorage.setItem('danmaku_memories', JSON.stringify(memories));
-              console.log('[弹幕] 已清除失效的缓存记忆');
+              console.log('[弹幕] 已清除失效的缓存');
             }
           } catch (e) {
-            console.error('[弹幕] 清除缓存记忆失败:', e);
+            console.error('[弹幕] 清除缓存失败:', e);
           }
         }
       } catch (error) {
@@ -2048,14 +2049,14 @@ function PlayPageClient() {
               const memories = JSON.parse(memoriesJson);
               delete memories[title];
               localStorage.setItem('danmaku_memories', JSON.stringify(memories));
-              console.log('[弹幕] 已清除失效的缓存记忆');
+              console.log('[弹幕] 已清除失效的缓存');
             }
           } catch (e) {
-            console.error('[弹幕] 清除缓存记忆失败:', e);
+            console.error('[弹幕] 清除缓存失败:', e);
           }
         }
       }
-      // 继续执行后面的自动搜索逻辑，不要 return
+      // 如果缓存加载失败，继续执行后面的自动搜索逻辑
     }
 
     // 自动搜索弹幕
@@ -3534,8 +3535,8 @@ function PlayPageClient() {
                 
               </div>
 
-              {/* 第三方应用打开按钮 */}
-              {videoUrl && (
+              {/* 第三方应用打开按钮 - 观影室同步状态下隐藏 */}
+              {videoUrl && !playSync.isInRoom && (
                 <div className='mt-3 px-2 lg:flex-shrink-0 flex justify-end'>
                   <div className='bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg p-2 border border-gray-200/50 dark:border-gray-700/50 w-full lg:w-auto overflow-x-auto'>
                     <div className='flex gap-1.5 justify-between lg:flex-wrap items-center'>
@@ -3802,29 +3803,19 @@ function PlayPageClient() {
 
             {/* 选集和换源 - 在移动端始终显示，在 lg 及以上可折叠 */}
             <div
-              className={`h-[300px] lg:h-full md:overflow-hidden transition-all duration-300 ease-in-out relative ${
+              className={`h-[300px] lg:h-full md:overflow-hidden transition-all duration-300 ease-in-out ${
                 isEpisodeSelectorCollapsed
                   ? 'md:col-span-1 lg:hidden lg:opacity-0 lg:scale-95'
                   : 'md:col-span-1 lg:opacity-100 lg:scale-100'
               }`}
             >
-              {/* 观影室房员禁用层 */}
-              {playSync.isInRoom && playSync.shouldDisableControls && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                  <div className="text-center p-4">
-                    <p className="text-white text-lg font-bold mb-2">👥 观影室模式</p>
-                    <p className="text-gray-300 text-sm">
-                      {playSync.isOwner ? '您是房主，可以控制播放' : '房主控制中，无法切换集数和播放源'}
-                    </p>
-                  </div>
-                </div>
-              )}
               <EpisodeSelector
                 totalEpisodes={totalEpisodes}
                 episodes_titles={detail?.episodes_titles || []}
                 value={currentEpisodeIndex + 1}
                 onChange={playSync.shouldDisableControls ? () => { /* disabled */ } : handleEpisodeChange}
                 onSourceChange={playSync.shouldDisableControls ? () => { /* disabled */ } : handleSourceChange}
+                isRoomMember={playSync.shouldDisableControls}
                 currentSource={currentSource}
                 currentId={currentId}
                 videoTitle={searchTitle || videoTitle}
